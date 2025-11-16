@@ -12,7 +12,7 @@ Author: Douxxtech
 Email: douxx@douxx.tech
 GitHub: https://github.com/dpipstudio/dlogger
 License: GPL-3.0
-Python: >=3.8
+Python: >=3.6
 
 Example:
     >>> from dlogger import DLogger
