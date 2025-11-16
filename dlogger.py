@@ -10,7 +10,7 @@ A DPIP Studio project - See https://dpip.lol
 
 Author: Douxxtech
 Email: douxx@douxx.tech
-GitHub: https://github.com/douxxtech/dlogger
+GitHub: https://github.com/dpipstudio/dlogger
 License: GPL-3.0
 Python: >=3.8
 
