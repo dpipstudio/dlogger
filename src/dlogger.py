@@ -18,13 +18,16 @@ Example:
     >>> from dlogger import DLogger
     >>> Log = DLogger(
     ...     icons={'success': 'OK', 'error': 'ERR'},
-    ...     styles={'success': 'bright_green', 'error': 'bright_red'}
+    ...     styles={'success': 'bright_green', 'error': 'bright_red'},
+    ...     show_time=True,
+    ...     time_format='%Y-%m-%d %H:%M:%S'
     ... )
     >>> Log.success("Operation completed!")
     >>> Log.error("Something went wrong!")
 """
 
 import sys
+from datetime import datetime
 from typing import Dict, Optional, Callable
 
 
@@ -69,7 +72,9 @@ class DLogger:
         'bright_white': '\033[97m',
     }
     
-    def __init__(self, icons: Dict[str, str], styles: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, icons: Dict[str, str], styles: Optional[Dict[str, str]] = None,
+                 show_time: bool = False, time_format: str = '%H:%M:%S',
+                 time_style: str = 'bright_white') -> None:
         """
         Initialize logger with icons and optional style mappings.
         
@@ -82,17 +87,45 @@ class DLogger:
             styles: Optional dictionary mapping method names to color styles.
                     Must use keys from COLORS dict.
                     Example: {'success': 'bright_green', 'error': 'bright_red'}
+            show_time: Whether to display timestamp before messages (default: False).
+            time_format: strftime format string for timestamp (default: '%H:%M:%S').
+                        Common formats:
+                        - '%H:%M:%S' -> 14:30:45
+                        - '%Y-%m-%d %H:%M:%S' -> 2025-11-16 16:52:45
+                        - '%I:%M:%S %p' -> 04:52:45 PM
+                        - '%b %d %H:%M:%S' -> Mar 15 16:52:45
+            time_style: Color style for timestamp (default: 'bright_white').
                     
         Example:
             >>> Log = DLogger(
             ...     icons={'success': 'OK', 'error': 'ERR'},
-            ...     styles={'success': 'bright_green', 'error': 'bright_red'}
+            ...     styles={'success': 'bright_green', 'error': 'bright_red'},
+            ...     show_time=True,
+            ...     time_format='%Y-%m-%d %H:%M:%S'
             ... )
             >>> # This creates Log.success() and Log.error() methods automatically
         """
         self.ICONS: Dict[str, str] = icons
         self._styles: Dict[str, str] = styles or {}
+        self._show_time: bool = show_time
+        self._time_format: str = time_format
+        self._time_style: str = time_style
         self._generate_methods()
+    
+    def _get_timestamp(self) -> str:
+        """
+        Get formatted timestamp string.
+        
+        Returns:
+            Formatted timestamp string according to time_format setting.
+        """
+        if not self._show_time:
+            return ''
+        try:
+            return datetime.now().strftime(self._time_format)
+        except ValueError:
+            # fallback if format string is invalid
+            return datetime.now().strftime('%H:%M:%S')
     
     def print(self, message: str, style: str = '', icon: str = '', end: str = '\n') -> None:
         """
@@ -111,17 +144,30 @@ class DLogger:
         """
         color = self.COLORS.get(style, '')
         icon_char = icon
+        timestamp = self._get_timestamp()
+        
+        # output parts
+        parts = []
+        
+        if timestamp:
+            time_color = self.COLORS.get(self._time_style, '')
+            if time_color:
+                parts.append(f"{time_color}[{timestamp}]\033[0m")
+            else:
+                parts.append(f"[{timestamp}]")
         
         if icon_char:
             if color:
-                print(f"{color}[{icon_char}]\033[0m {message}", end=end)
+                parts.append(f"{color}[{icon_char}]\033[0m")
             else:
-                print(f"[{icon_char}] {message}", end=end)
+                parts.append(f"[{icon_char}]")
+        
+        if color and not icon_char:
+            parts.append(f"{color}{message}\033[0m")
         else:
-            if color:
-                print(f"{color}{message}\033[0m", end=end)
-            else:
-                print(f"{message}", end=end)
+            parts.append(message)
+        
+        print(' '.join(parts), end=end)
         sys.stdout.flush()
     
     def header(self, text: str) -> None:
