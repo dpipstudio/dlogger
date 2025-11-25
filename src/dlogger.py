@@ -54,8 +54,17 @@ class DLogger:
     
     COLORS: Dict[str, str] = {
         'reset': '\033[0m',
+        
         'bold': '\033[1m',
+        'dim': '\033[2m',
+        'italic': '\033[3m',
         'underline': '\033[4m',
+        'blink': '\033[5m',
+        'reverse': '\033[7m',
+        'hidden': '\033[8m',
+        'strikethrough': '\033[9m',
+        
+        'black': '\033[30m',
         'red': '\033[31m',
         'green': '\033[32m',
         'yellow': '\033[33m',
@@ -63,6 +72,14 @@ class DLogger:
         'magenta': '\033[35m',
         'cyan': '\033[36m',
         'white': '\033[37m',
+        'gray': '\033[90m',
+        'orange': '\033[38;5;208m',
+        'purple': '\033[38;5;129m',
+        'pink': '\033[38;5;213m',
+        'bg_orange': '\033[48;5;208m',
+        'bg_purple': '\033[48;5;129m',
+        'bg_pink': '\033[48;5;213m',
+        
         'bright_red': '\033[91m',
         'bright_green': '\033[92m',
         'bright_yellow': '\033[93m',
@@ -70,11 +87,29 @@ class DLogger:
         'bright_magenta': '\033[95m',
         'bright_cyan': '\033[96m',
         'bright_white': '\033[97m',
+        
+        'bg_black': '\033[40m',
+        'bg_red': '\033[41m',
+        'bg_green': '\033[42m',
+        'bg_yellow': '\033[43m',
+        'bg_blue': '\033[44m',
+        'bg_magenta': '\033[45m',
+        'bg_cyan': '\033[46m',
+        'bg_white': '\033[47m',
+        'bg_gray': '\033[100m',
+
+        'bg_bright_red': '\033[101m',
+        'bg_bright_green': '\033[102m',
+        'bg_bright_yellow': '\033[103m',
+        'bg_bright_blue': '\033[104m',
+        'bg_bright_magenta': '\033[105m',
+        'bg_bright_cyan': '\033[106m',
+        'bg_bright_white': '\033[107m',
     }
     
-    def __init__(self, icons: Dict[str, str], styles: Optional[Dict[str, str]] = None,
+    def __init__(self, icons: Dict[str, str] = None, styles: Optional[Dict[str, str]] = None,
                  show_time: bool = False, time_format: str = '%H:%M:%S',
-                 time_style: str = 'bright_white') -> None:
+                 time_style: str = 'bright_white', delimiters: str = '[]') -> None:
         """
         Initialize logger with icons and optional style mappings.
         
@@ -105,27 +140,18 @@ class DLogger:
             ... )
             >>> # This creates Log.success() and Log.error() methods automatically
         """
-        self.ICONS: Dict[str, str] = icons
+
+        if delimiters % 2 != 0:
+            raise ValueError("'Delimiters' argument must be a string of an even count of characters.")
+            Hi :3
+
+        self._icons: Dict[str, str] = icons or {}
         self._styles: Dict[str, str] = styles or {}
         self._show_time: bool = show_time
         self._time_format: str = time_format
         self._time_style: str = time_style
+        self._left_delimiter, self._right_delimiter = delimiters[:len(delimiters)//2 + len(delimiters)%2], delimiters[len(delimiters)//2 + len(delimiters)%2:]
         self._generate_methods()
-    
-    def _get_timestamp(self) -> str:
-        """
-        Get formatted timestamp string.
-        
-        Returns:
-            Formatted timestamp string according to time_format setting.
-        """
-        if not self._show_time:
-            return ''
-        try:
-            return datetime.now().strftime(self._time_format)
-        except ValueError:
-            # fallback if format string is invalid
-            return datetime.now().strftime('%H:%M:%S')
     
     def print(self, message: str, style: str = '', icon: str = '', end: str = '\n') -> None:
         """
@@ -142,7 +168,7 @@ class DLogger:
             >>> Log.print("Hello", style='green', icon='MSG')
             [MSG] Hello
         """
-        color = self.COLORS.get(style, '')
+        color = self._parse_style(style)
         icon_char = icon
         timestamp = self._get_timestamp()
         
@@ -150,17 +176,17 @@ class DLogger:
         parts = []
         
         if timestamp:
-            time_color = self.COLORS.get(self._time_style, '')
+            time_color = self._parse_style(self._time_style)
             if time_color:
-                parts.append(f"{time_color}[{timestamp}]\033[0m")
+                parts.append(f"{time_color}{self._left_delimiter}{timestamp}{self._right_delimiter}\033[0m")
             else:
                 parts.append(f"[{timestamp}]")
         
         if icon_char:
             if color:
-                parts.append(f"{color}[{icon_char}]\033[0m")
+                parts.append(f"{color}{self._left_delimiter}{icon_char}{self._right_delimiter}\033[0m")
             else:
-                parts.append(f"[{icon_char}]")
+                parts.append(f"{self._left_delimiter}{icon_char}{self._right_delimiter}")
         
         if color and not icon_char:
             parts.append(f"{color}{message}\033[0m")
@@ -268,6 +294,14 @@ class DLogger:
         """
         sys.stdout.write('\n')
         sys.stdout.flush()
+
+    def rgb(self, r: int, g: int, b: int, background: bool = False) -> str:
+       code = 48 if background else 38
+       return f'\033[{code};2;{r};{g};{b}m'
+    
+    def c256(self, code: int, background: bool = False) -> str:
+        prefix = 48 if background else 38
+        return f'\033[{prefix};5;{code}m'
     
     def _generate_methods(self) -> None:
         """
@@ -284,7 +318,7 @@ class DLogger:
             This is called automatically during __init__. You should not need
             to call this method manually.
         """
-        for method_name, icon_text in self.ICONS.items():
+        for method_name, icon_text in self._icons.items():
             style = self._styles.get(method_name, '')
             
             def make_method(icon_val: str, style_val: str) -> Callable[[str], None]:
@@ -300,6 +334,34 @@ class DLogger:
             
             # Bind the method to this instance
             setattr(self, method_name, make_method(icon_text, style))
+
+    def _parse_style(self, style: str) -> str:
+       if not style:
+           return ''
+       if ' ' not in style:
+           return self.COLORS.get(style, '')
+       
+       style_parts = [s.strip() for s in style.split()]
+       codes = []
+       for part in style_parts:
+           if part in self.COLORS:
+               codes.append(self.COLORS[part])
+       return ''.join(codes)
+    
+    def _get_timestamp(self) -> str:
+        """
+        Get formatted timestamp string.
+        
+        Returns:
+            Formatted timestamp string according to time_format setting.
+        """
+        if not self._show_time:
+            return ''
+        try:
+            return datetime.now().strftime(self._time_format)
+        except ValueError:
+            # fallback if format string is invalid
+            return datetime.now().strftime('%H:%M:%S')
 
 
 if __name__ == "__main__":
