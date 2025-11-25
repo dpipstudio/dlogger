@@ -151,7 +151,7 @@ class DLogger:
             >>> # This creates Log.success() and Log.error() methods automatically
         """
 
-        if delimiters % 2 != 0:
+        if len(delimiters) % 2 != 0:
             raise ValueError("'Delimiters' argument must be a string of an even count of characters.")
             Hi :3
 
@@ -395,34 +395,80 @@ class DLogger:
             setattr(self, method_name, make_method(icon_text, style))
 
     def _parse_style(self, style: str) -> str:
-       """
+        """
         Parse style string and convert to ANSI codes.
         
-        Handles both single styles and multiple space-separated styles.
-        Combines multiple ANSI codes when multiple styles are specified.
+        Supports:
+        - Named colors: 'green', 'bold bright_red'
+        - RGB format: 'rgb(255, 100, 50)' or 'rgb(255,100,50,bg)'
+        - 256-color format: 'c256(208)' or 'c256(208,bg)'
+        - Direct ANSI codes: returned from rgb() and c256() functions
+        - Combinations: 'bold rgb(255,100,50) underline'
         
         Args:
-            style: Style string (e.g., 'green', 'bold bright_red', 'underline cyan').
+            style: Style string with one or more color/style specifications,
+                or direct ANSI escape codes.
         
         Returns:
             Combined ANSI escape code string, or empty string if style is invalid.
             
         Example:
-            >>> Log = DLogger(icons={})
-            >>> single = Log._parse_style('green')
-            >>> multiple = Log._parse_style('bold underline bright_red')
+            >>> Log._parse_style('green')
+            >>> Log._parse_style('bold rgb(255,100,50)')
+            >>> custom = Log.rgb(255, 100, 50)
+            >>> Log._parse_style(custom)
         """
-       if not style:
-           return ''
-       if ' ' not in style:
-           return self.COLORS.get(style, '')
-       
-       style_parts = [s.strip() for s in style.split()]
-       codes = []
-       for part in style_parts:
-           if part in self.COLORS:
-               codes.append(self.COLORS[part])
-       return ''.join(codes)
+        if not style:
+            return ''
+        
+        if style.startswith('\033['):
+            return style
+        
+        if ' ' not in style and '(' not in style:
+            return self.COLORS.get(style, '')
+        
+        style_parts = [s.strip() for s in style.split()]
+        codes = []
+        
+        for part in style_parts:
+            if part.startswith('\033['):
+                codes.append(part)
+                continue
+            
+            # rgb format: rgb(r,g,b) or rgb(r,g,b,bg)
+            if part.startswith('rgb(') and part.endswith(')'):
+                try:
+                    params = part[4:-1].split(',')
+                    params = [p.strip() for p in params]
+                    
+                    if len(params) == 3:
+                        r, g, b = int(params[0]), int(params[1]), int(params[2])
+                        codes.append(self.rgb(r, g, b, background=False))
+                    elif len(params) == 4 and params[3].lower() == 'bg':
+                        r, g, b = int(params[0]), int(params[1]), int(params[2])
+                        codes.append(self.rgb(r, g, b, background=True))
+                except (ValueError, IndexError):
+                    pass
+            
+            # 256-color format: c256(code) or c256(code,bg)
+            elif part.startswith('c256(') and part.endswith(')'):
+                try:
+                    params = part[5:-1].split(',')
+                    params = [p.strip() for p in params]
+                    
+                    if len(params) == 1:
+                        code = int(params[0])
+                        codes.append(self.c256(code, background=False))
+                    elif len(params) == 2 and params[1].lower() == 'bg':
+                        code = int(params[0])
+                        codes.append(self.c256(code, background=True))
+                except (ValueError, IndexError):
+                    pass
+            
+            elif part in self.COLORS:
+                codes.append(self.COLORS[part])
+        
+        return ''.join(codes)
     
     def _get_timestamp(self) -> str:
         """
@@ -441,14 +487,82 @@ class DLogger:
 
 
 if __name__ == "__main__":
-
     Log = DLogger(
         icons={
-            'warning': 'WARN'
+            'welcome': 'WLC',
+            'info': 'INFO',
+            'example': 'CODE',
+            'output': 'OUT',
+            'demo': 'DEMO'
         },
         styles={
-            'warning': 'bright_yellow'
+            'welcome': 'bright_cyan',
+            'info': 'white',
+            'example': 'yellow',
+            'output': 'bright_green',
+            'demo': 'magenta'
         }
     )
 
-    Log.warning("Please use this code as a module / library.")
+    Log.header("DLogger", 'bold bright_magenta')
+    Log.welcome("Dynamic Console Logger for Python\n")
+    
+    Log.section("Overview")
+    Log.info("DLogger is a simple logging tool with colors, icons, and progress bars.")
+    Log.info("Define your icons once, get custom methods automatically.\n")
+    
+    Log.section("Basic Usage")
+    Log.example("from dlogger import DLogger")
+    Log.example("")
+    Log.example("Log = DLogger(")
+    Log.example("    icons={'success': 'OK', 'error': 'ERR'},")
+    Log.example("    styles={'success': 'green', 'error': 'red'}")
+    Log.example(")")
+    Log.example("")
+    Log.example("Log.success('Connected to database')")
+    Log.example("Log.error('Connection failed')")
+    print()
+    
+    Log.output("Output:")
+    demo_log = DLogger(
+        icons={'success': 'OK', 'error': 'ERR'},
+        styles={'success': 'bright_green', 'error': 'bright_red'}
+    )
+    demo_log.success("Connected to database")
+    demo_log.error("Connection failed")
+    print()
+    
+    Log.section("Available Colors")
+    for color in Log.COLORS:
+        Log.print('', style=color, icon=color, end=' ')
+    Log.header("")
+    
+    
+    Log.section("Custom Colors")
+    Log.example("# RGB colors (16 million options)")
+    Log.example("custom = Log.rgb(255, 100, 50)")
+    Log.example("Log.print('Message', style=custom)")
+    print()
+    
+    Log.example("# 256-color palette")
+    Log.example("orange = Log.c256(208)")
+    Log.example("Log.print('Message', style=orange)")
+    print()
+
+    Log.example("# 256-color palette + underline")
+    Log.example("Log.print('Message', style='underline c256(208)')")
+    
+    Log.output("Output:")
+    coral = Log.rgb(255, 127, 80)
+    Log.print("RGB color example", style=coral, icon='RGB')
+    orange = Log.c256(208)
+    Log.print("256-color example", style=orange, icon='256')
+    Log.print('Underlined + 256-color example', style='underline c256(208)', icon="MIX")
+    print()
+    
+    Log.section("Links")
+    Log.info("GitHub: https://github.com/dpipstudio/dlogger")
+    Log.info("DPIP Studio: https://dpip.lol")
+    print()
+    
+    Log.header("Happy Logging!", 'bright_green')
