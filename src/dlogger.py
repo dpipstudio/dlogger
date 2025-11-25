@@ -26,10 +26,15 @@ Example:
     >>> Log.error("Something went wrong!")
 """
 
+import os
 import sys
 from datetime import datetime
 from typing import Dict, Optional, Callable
 
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 class DLogger:
     """
@@ -109,7 +114,7 @@ class DLogger:
     
     def __init__(self, icons: Dict[str, str] = None, styles: Optional[Dict[str, str]] = None,
                  show_time: bool = False, time_format: str = '%H:%M:%S',
-                 time_style: str = 'bright_white', delimiters: str = '[]') -> None:
+                 time_style: str = 'bright_white', delimiters: str = '[]', save: bool = False, single_file: bool = False, save_to: str = ".") -> None:
         """
         Initialize logger with icons and optional style mappings.
         
@@ -125,17 +130,27 @@ class DLogger:
                     Example: {'success': 'bright_green', 'error': 'bright_red'}
             show_time: Whether to display timestamp before messages (default: False).
             time_format: strftime format string for timestamp (default: '%H:%M:%S').
-                        Common formats:
-                        - '%H:%M:%S' -> 14:30:45
-                        - '%Y-%m-%d %H:%M:%S' -> 2025-11-16 16:52:45
-                        - '%I:%M:%S %p' -> 04:52:45 PM
-                        - '%b %d %H:%M:%S' -> Mar 15 16:52:45
+                    Common formats:
+                    - '%H:%M:%S' -> 14:30:45
+                    - '%Y-%m-%d %H:%M:%S' -> 2025-11-16 16:52:45
+                    - '%I:%M:%S %p' -> 04:52:45 PM
+                    - '%b %d %H:%M:%S' -> Mar 15 16:52:45
             time_style: Color style for timestamp (default: 'bright_white').
             delimiters: String of characters to use as delimiters around icons and
-                       timestamps. Must have an even number of characters. The first
-                       half becomes the left delimiter, the second half becomes the
-                       right delimiter. Examples: '[]' (default), '()', '{}', '<>',
-                       '||', '--'.
+                    timestamps. Must have an even number of characters. The first
+                    half becomes the left delimiter, the second half becomes the
+                    right delimiter. Examples: '[]' (default), '()', '{}', '<>',
+                    '||', '--'.
+            save: Enable saving logs to file(s). When True, all log messages will be
+                    written to disk in addition to console output (default: False).
+            single_file: If True, all logs are saved to a single file specified by
+                    save_to. If False, logs are saved to separate files based on
+                    their icon names (e.g., 'success.log', 'error.log') in the
+                    save_to directory (default: False).
+            save_to: File or directory path for saved logs. If single_file is True,
+                    this should be a file path (e.g., 'app.log'). If single_file is
+                    False, this should be an existing directory path where separate
+                    log files will be created (default: '.').
                     
         Raises:
             ValueError: If delimiters string has an odd number of characters.
@@ -152,8 +167,22 @@ class DLogger:
         """
 
         if len(delimiters) % 2 != 0:
-            raise ValueError("'Delimiters' argument must be a string of an even count of characters.")
+            raise ValueError("'delimiters' argument must be a string of an even count of characters.")
             Hi :3
+
+        if save:
+            if single_file:
+                save_dir = os.path.dirname(save_to) or '.'
+
+                if not os.path.exists(save_dir):
+                    raise ValueError(f"Directory '{save_dir}' does not exist for save_to file path.")
+                
+                if os.path.isdir(save_to):
+                    raise ValueError("'save_to' must be a file path when 'single_file' is True.")
+                
+            else:
+                if not os.path.isdir(save_to):
+                    raise ValueError(f"'save_to' must be an existing directory when 'single_file' is False.")
 
         self._icons: Dict[str, str] = icons or {}
         self._styles: Dict[str, str] = styles or {}
@@ -161,6 +190,9 @@ class DLogger:
         self._time_format: str = time_format
         self._time_style: str = time_style
         self._left_delimiter, self._right_delimiter = delimiters[:len(delimiters)//2 + len(delimiters)%2], delimiters[len(delimiters)//2 + len(delimiters)%2:]
+        self._save: bool = save
+        self._single_file: bool = single_file
+        self._save_path: str = save_to
         self._generate_methods()
     
     def print(self, message: str, style: str = '', icon: str = '', end: str = '\n') -> None:
@@ -196,7 +228,7 @@ class DLogger:
             if time_color:
                 parts.append(f"{time_color}{self._left_delimiter}{timestamp}{self._right_delimiter}\033[0m")
             else:
-                parts.append(f"[{timestamp}]")
+                parts.append(f"{self._left_delimiter}{timestamp}{self._right_delimiter}")
         
         if icon_char:
             if color:
@@ -211,6 +243,16 @@ class DLogger:
         
         print(' '.join(parts), end=end)
         sys.stdout.flush()
+
+        try:
+            if self._save:
+                if self._single_file:
+                    self._save_to(f"{f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", self._save_path)
+
+                else:
+                    self._save_to(f"{f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", os.path.join(self._save_path, f"{icon_char if icon else 'default'}.log"))
+        except:
+            ... # maybe do something one time
     
     def header(self, text: str, style: str = 'bright_blue') -> None:
         """
@@ -484,6 +526,70 @@ class DLogger:
         except ValueError:
             # fallback if format string is invalid
             return datetime.now().strftime('%H:%M:%S')
+        
+    def _save_to(self, content, path):
+        """
+        Save content to file with proper file locking.
+        
+        Writes log content to the specified file path using file locking
+        to prevent corruption from concurrent writes. Automatically creates
+        the file if it doesn't exist, or appends to existing files.
+        
+        Args:
+            content: Text content to save to the file.
+            path: Full file path where content should be saved.
+        
+        Raises:
+            IOError: If file operations fail due to permissions, disk space,
+                    or other I/O errors.
+                    
+        Note:
+            Uses platform-specific locking (msvcrt on Windows, fcntl on Unix).
+        """
+        try:
+            with open(path, "a", encoding='utf-8') as f:
+                self._lock_file(f)
+                try:
+                    f.write(content)
+                    f.flush()
+                finally:
+                    self._unlock_file(f)
+        except Exception as e:
+            raise IOError(f"Failed to write to {path}: {e}")
+
+    if os.name == 'nt':
+        def _lock_file(self, f):
+            """
+            Locks a file, on Windows systems
+            
+            :param f: File object to lock
+            """
+            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+
+        def _unlock_file(self, f):
+            """
+            Unlocks a file, on Windows systems
+            
+            :param f: File object to unlock
+            """
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+
+    else:
+        def _lock_file(self, f):
+            """
+            Locks a file, on other systems
+            
+            :param f: File object to lock
+            """
+            fcntl.flock(f, fcntl.LOCK_EX)
+
+        def _unlock_file(self, f):
+            """
+            Unlocks a file, on other systems
+            
+            :param f: File object to unlock
+            """
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 if __name__ == "__main__":
