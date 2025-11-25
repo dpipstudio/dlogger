@@ -120,7 +120,8 @@ class DLogger:
             icons: Dictionary mapping method names to icon strings.
                    Example: {'success': 'OK', 'error': 'ERR', 'info': 'INFO'}
             styles: Optional dictionary mapping method names to color styles.
-                    Must use keys from COLORS dict.
+                    Must use keys from COLORS dict. Supports multiple styles
+                    separated by spaces (e.g., 'bold bright_green').
                     Example: {'success': 'bright_green', 'error': 'bright_red'}
             show_time: Whether to display timestamp before messages (default: False).
             time_format: strftime format string for timestamp (default: '%H:%M:%S').
@@ -130,13 +131,22 @@ class DLogger:
                         - '%I:%M:%S %p' -> 04:52:45 PM
                         - '%b %d %H:%M:%S' -> Mar 15 16:52:45
             time_style: Color style for timestamp (default: 'bright_white').
+            delimiters: String of characters to use as delimiters around icons and
+                       timestamps. Must have an even number of characters. The first
+                       half becomes the left delimiter, the second half becomes the
+                       right delimiter. Examples: '[]' (default), '()', '{}', '<>',
+                       '||', '--'.
                     
+        Raises:
+            ValueError: If delimiters string has an odd number of characters.
+            
         Example:
             >>> Log = DLogger(
             ...     icons={'success': 'OK', 'error': 'ERR'},
             ...     styles={'success': 'bright_green', 'error': 'bright_red'},
             ...     show_time=True,
-            ...     time_format='%Y-%m-%d %H:%M:%S'
+            ...     time_format='%Y-%m-%d %H:%M:%S',
+            ...     delimiters='()'
             ... )
             >>> # This creates Log.success() and Log.error() methods automatically
         """
@@ -157,16 +167,22 @@ class DLogger:
         """
         Core print method with styling and icon support.
         
+        Supports multiple styles combined with spaces (e.g., 'bold bright_green').
+        Uses custom delimiters if configured during initialization.
+        
         Args:
             message: The text message to print.
             style: Color style from COLORS dict (e.g., 'bright_green', 'red').
-            icon: Icon text to display in brackets before the message.
+                   Can combine multiple styles with spaces (e.g., 'bold underline green').
+            icon: Icon text to display in delimiters before the message.
             end: String appended after the message (default: newline).
             
         Example:
             >>> Log = DLogger(icons={})
             >>> Log.print("Hello", style='green', icon='MSG')
             [MSG] Hello
+            >>> Log.print("Important", style='bold bright_red', icon='ALERT')
+            [ALERT] Important
         """
         color = self._parse_style(style)
         icon_char = icon
@@ -196,9 +212,9 @@ class DLogger:
         print(' '.join(parts), end=end)
         sys.stdout.flush()
     
-    def header(self, text: str) -> None:
+    def header(self, text: str, style: str = 'bright_blue') -> None:
         """
-        Print a header message in bright blue with extra spacing.
+        Print a header message with extra spacing.
         
         Args:
             text: The header text to display.
@@ -209,10 +225,10 @@ class DLogger:
             Application Started
             
         """
-        self.print(text, 'bright_blue', end='\n\n')
+        self.print(text, style, end='\n\n')
         sys.stdout.flush()
     
-    def section(self, text: str) -> None:
+    def section(self, text: str, style: str = 'bright_blue', bar_sytle: str = 'blue') -> None:
         """
         Print a section divider with decorative line.
         
@@ -228,8 +244,8 @@ class DLogger:
              Configuration ────────────────
             
         """
-        self.print(f" {text} ", 'bright_blue', end='')
-        self.print("─" * (len(text) + 2), 'blue', end='\n\n')
+        self.print(f" {text} ", style, end='')
+        self.print("─" * (len(text) + 2), bar_sytle, end='\n\n')
         sys.stdout.flush()
     
     def progress_bar(self, iteration: int, total: int, prefix: str = '', 
@@ -296,12 +312,55 @@ class DLogger:
         sys.stdout.flush()
 
     def rgb(self, r: int, g: int, b: int, background: bool = False) -> str:
-       code = 48 if background else 38
-       return f'\033[{code};2;{r};{g};{b}m'
+       """
+        Generate ANSI escape code for 24-bit RGB color.
+        
+        Creates a color code string for true color (16 million colors) support
+        in compatible terminals. The returned string can be used in print statements.
+        
+        Args:
+            r: Red component (0-255).
+            g: Green component (0-255).
+            b: Blue component (0-255).
+            background: If True, applies color to background instead of foreground
+                       (default: False).
+        
+        Returns:
+            ANSI escape code string for the specified RGB color.
+            
+        Example:
+            >>> Log = DLogger(icons={})
+            >>> custom_color = Log.rgb(255, 100, 50)
+            >>> Log.print("Hello!", style=custom_color, icon="WLC")
+        """
+       
+       return f'\033[{48 if background else 38};2;{r};{g};{b}m'
     
     def c256(self, code: int, background: bool = False) -> str:
-        prefix = 48 if background else 38
-        return f'\033[{prefix};5;{code}m'
+        """
+        Generate ANSI escape code for 256-color palette.
+        
+        Creates a color code string using the 256-color palette supported by
+        most modern terminals. The returned string can be used in print statements.
+        
+        Args:
+            code: Color code from the 256-color palette (0-255).
+                  Standard colors: 0-15
+                  216 color cube: 16-231 (6x6x6 RGB cube)
+                  Grayscale: 232-255
+            background: If True, applies color to background instead of foreground
+                       (default: False).
+        
+        Returns:
+            ANSI escape code string for the specified palette color.
+            
+        Example:
+            >>> Log = DLogger(icons={})
+            >>> orange = Log.c256(208)
+            >>> Log.print(":3", style=orange, icon="ORG")
+        """
+
+        return f'\033[{48 if background else 38};5;{code}m'
     
     def _generate_methods(self) -> None:
         """
@@ -336,6 +395,23 @@ class DLogger:
             setattr(self, method_name, make_method(icon_text, style))
 
     def _parse_style(self, style: str) -> str:
+       """
+        Parse style string and convert to ANSI codes.
+        
+        Handles both single styles and multiple space-separated styles.
+        Combines multiple ANSI codes when multiple styles are specified.
+        
+        Args:
+            style: Style string (e.g., 'green', 'bold bright_red', 'underline cyan').
+        
+        Returns:
+            Combined ANSI escape code string, or empty string if style is invalid.
+            
+        Example:
+            >>> Log = DLogger(icons={})
+            >>> single = Log._parse_style('green')
+            >>> multiple = Log._parse_style('bold underline bright_red')
+        """
        if not style:
            return ''
        if ' ' not in style:
