@@ -72,11 +72,11 @@ Log.error("Connection failed")
 
 ### Common Time Formats
 
-- `'%H:%M:%S'` → `14:30:45`
-- `'%Y-%m-%d %H:%M:%S'` → `2024-03-15 14:30:45`
-- `'%I:%M:%S %p'` → `02:30:45 PM`
-- `'%b %d %H:%M:%S'` → `Mar 15 14:30:45`
-- `'%Y-%m-%d'` → `2024-03-15`
+- `'%H:%M:%S'` -> `14:30:45`
+- `'%Y-%m-%d %H:%M:%S'` -> `2024-03-15 14:30:45`
+- `'%I:%M:%S %p'` -> `02:30:45 PM`
+- `'%b %d %H:%M:%S'` -> `Mar 15 14:30:45`
+- `'%Y-%m-%d'` -> `2024-03-15`
 
 ## Custom Delimiters
 
@@ -97,12 +97,13 @@ Log.info("Message with parentheses")
 ```
 
 **Available delimiter styles:**
-- `'[]'` → `[INFO]` (default)
-- `'()'` → `(INFO)`
-- `'{}'` → `{INFO}`
-- `'<>'` → `<INFO>`
-- `'||'` → `|INFO|`
-- `'--'` → `-INFO-`
+- `'[]'` -> `[INFO]` (default)
+- `'()'` -> `(INFO)`
+- `'{}'` -> `{INFO}`
+- `'<>'` -> `<INFO>`
+- `'||'` -> `|INFO|`
+- `'--'` -> `-INFO-`
+> Those are only examples, you can use any character you want as a delimiter.
 
 Note: Delimiters must have an even number of characters. The first half becomes the left delimiter, the second half becomes the right delimiter.
 
@@ -256,9 +257,9 @@ Log.success("Recovered successfully")
 ```
 
 **Result:** Creates separate files:
-- `./logs/INFO.log` → `[INFO] Application started`
-- `./logs/ERR.log` → `[ERR] Connection failed`
-- `./logs/OK.log` → `[OK] Recovered successfully`
+- `./logs/INFO.log` -> `[INFO] Application started`
+- `./logs/ERR.log` -> `[ERR] Connection failed`
+- `./logs/OK.log` -> `[OK] Recovered successfully`
 
 ### Save Options
 ```python
@@ -443,11 +444,11 @@ Log.error("Connection failed")
 
 ### Common Time Formats
 
-- `'%H:%M:%S'` → `14:30:45`
-- `'%Y-%m-%d %H:%M:%S'` → `2024-03-15 14:30:45`
-- `'%I:%M:%S %p'` → `02:30:45 PM`
-- `'%b %d %H:%M:%S'` → `Mar 15 14:30:45`
-- `'%Y-%m-%d'` → `2024-03-15`
+- `'%H:%M:%S'` -> `14:30:45`
+- `'%Y-%m-%d %H:%M:%S'` -> `2024-03-15 14:30:45`
+- `'%I:%M:%S %p'` -> `02:30:45 PM`
+- `'%b %d %H:%M:%S'` -> `Mar 15 14:30:45`
+- `'%Y-%m-%d'` -> `2024-03-15`
 
 
 ## Available Colors
