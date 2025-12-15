@@ -247,10 +247,12 @@ class DLogger:
         try:
             if self._save:
                 if self._single_file:
-                    self._save_to(f"{f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", self._save_path)
-
+                    if self._single_file:
+                        timestamp_part = f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''
+                        self._save_to(f"{timestamp_part}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", self._save_path)
                 else:
-                    self._save_to(f"{f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", os.path.join(self._save_path, f"{icon_char if icon else 'default'}.log"))
+                    timestamp_part = f"{self._left_delimiter}{timestamp}{self._right_delimiter} " if timestamp else ''
+                    self._save_to(f"{timestamp_part}{self._left_delimiter}{icon_char}{self._right_delimiter} {message} {end}", os.path.join(self._save_path, f"{icon_char if icon else 'default'}.log"))
         except:
             ... # maybe do something one time
     
