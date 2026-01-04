@@ -107,6 +107,10 @@ Log.info("Message with parentheses")
 
 Note: Delimiters must have an even number of characters. The first half becomes the left delimiter, the second half becomes the right delimiter.
 
+## Output Stream
+Output stream for console logging (default: sys.stdout).
+Use sys.stdout for regular output or sys.stderr for diagnostics/logs.
+
 ## Available Colors
 
 DLogger supports the following color styles:

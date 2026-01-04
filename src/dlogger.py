@@ -29,7 +29,7 @@ Example:
 import os
 import sys
 from datetime import datetime
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, Callable, TextIO
 
 if os.name == 'nt':
     import msvcrt
@@ -114,7 +114,7 @@ class DLogger:
     
     def __init__(self, icons: Dict[str, str] = None, styles: Optional[Dict[str, str]] = None,
                  show_time: bool = False, time_format: str = '%H:%M:%S',
-                 time_style: str = 'bright_white', delimiters: str = '[]', save: bool = False, single_file: bool = False, save_to: str = ".") -> None:
+                 time_style: str = 'bright_white', delimiters: str = '[]', save: bool = False, single_file: bool = False, save_to: str = ".", stream: TextIO = sys.stdout) -> None:
         """
         Initialize logger with icons and optional style mappings.
         
@@ -151,6 +151,7 @@ class DLogger:
                     this should be a file path (e.g., 'app.log'). If single_file is
                     False, this should be an existing directory path where separate
                     log files will be created (default: '.').
+            stream: Output stream for console logging (default: sys.stdout).
                     
         Raises:
             ValueError: If delimiters string has an odd number of characters.
@@ -193,6 +194,7 @@ class DLogger:
         self._save: bool = save
         self._single_file: bool = single_file
         self._save_path: str = save_to
+        self._stream: TextIO = stream
         self._generate_methods()
     
     def print(self, message: str, style: str = '', icon: str = '', end: str = '\n') -> None:
@@ -241,8 +243,9 @@ class DLogger:
         else:
             parts.append(message)
         
-        print(' '.join(parts), end=end)
-        sys.stdout.flush()
+        output_str = ' '.join(parts) + end
+        self._stream.write(output_str)
+        self._stream.flush()
 
         try:
             if self._save:
@@ -293,9 +296,9 @@ class DLogger:
         sys.stdout.flush()
     
     def progress_bar(self, iteration: int, total: int, prefix: str = '', 
-                     suffix: str = '', length: int = 30, fill: str = '#', 
-                     style: str = 'bright_cyan', icon: str = '', 
-                     auto_clear: bool = True) -> None:
+                 suffix: str = '', length: int = 30, fill: str = '#', 
+                 style: str = 'bright_cyan', icon: str = '', 
+                 auto_clear: bool = True) -> None:
         """
         Display a progress bar in the terminal.
         
@@ -319,26 +322,28 @@ class DLogger:
             ...     Log.progress_bar(i, 100, prefix='Loading:', suffix='Complete')
             Loading: [##########--------------------] 50.0% Complete
         """
+        
         percent = ("{0:.1f}").format(100 * (iteration / float(total)))
         filled_length = int(length * iteration // total)
         bar = fill * filled_length + '-' * (length - filled_length)
-        color = self.COLORS.get(style, '')
+        color = self._parse_style(style)
         
         if icon:
             if color:
-                sys.stdout.write(f"\r{color}[{icon}]\033[0m {prefix} [{bar}] {percent}% {suffix}")
+                self._stream.write(f"\r{color}[{icon}]\033[0m {prefix} [{bar}] {percent}% {suffix}")
             else:
-                sys.stdout.write(f"\r[{icon}] {prefix} [{bar}] {percent}% {suffix}")
+                self._stream.write(f"\r[{icon}] {prefix} [{bar}] {percent}% {suffix}")
         else:
             if color:
-                sys.stdout.write(f"\r{color}{prefix} [{bar}] {percent}% {suffix}\033[0m")
+                self._stream.write(f"\r{color}{prefix} [{bar}] {percent}% {suffix}\033[0m")
             else:
-                sys.stdout.write(f"\r{prefix} [{bar}] {percent}% {suffix}")
-        sys.stdout.flush()
+                self._stream.write(f"\r{prefix} [{bar}] {percent}% {suffix}")
+        self._stream.flush()
 
         if auto_clear and iteration >= total:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+            self._stream.write('\n')
+            self._stream.flush()
+
     
     def clear_progress_bar(self) -> None:
         """
